@@ -143,23 +143,44 @@ public class JSONCompleter {
         }
 
         var current = json.index(after: startIndex)
-        var isEscaped = false
+        var escapeStart: String.Index?
+        var remainingUnicodeEscapeDigits = 0
 
         while current < json.endIndex {
             let char = json[current]
-            if char == "\\" {
-                isEscaped.toggle()
-            } else if char == "\"" && !isEscaped {
+
+            if escapeStart != nil {
+                if remainingUnicodeEscapeDigits > 0 {
+                    if char.isHexDigit {
+                        remainingUnicodeEscapeDigits -= 1
+                        if remainingUnicodeEscapeDigits == 0 {
+                            escapeStart = nil
+                        }
+                    } else {
+                        escapeStart = nil
+                        remainingUnicodeEscapeDigits = 0
+                        if char == "\"" {
+                            return nil
+                        } else if char == "\\" {
+                            escapeStart = current
+                        }
+                    }
+                } else if char == "u" {
+                    remainingUnicodeEscapeDigits = 4
+                } else {
+                    escapeStart = nil
+                }
+            } else if char == "\\" {
+                escapeStart = current
+            } else if char == "\"" {
                 // Found the closing quote, string is complete
                 return nil
-            } else {
-                isEscaped = false
             }
             current = json.index(after: current)
         }
 
         // Reached end of string without finding a closing quote
-        return (string: "\"", endIndex: current)
+        return (string: "\"", endIndex: escapeStart ?? current)
     }
 
     private func completeArray(_ json: String, from startIndex: String.Index, depth: Int) throws

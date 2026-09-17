@@ -149,13 +149,31 @@ final class JSONCompleterTests {
         // Test partial escape sequence
         let partialEscape = "\"Partial escape: \\"
         let completedEscape = try completer.complete(partialEscape)
-        #expect(completedEscape.hasSuffix("\""))
-        #expect(completedEscape == "\"Partial escape: \\\"")
+        #expect(completedEscape == "\"Partial escape: \"")
+        #expect(isValidJSON(completedEscape))
 
         // Test partial Unicode escape
         let partialUnicode = "\"Unicode escape: \\u26"
         let completedUnicode = try completer.complete(partialUnicode)
-        #expect(completedUnicode.hasSuffix("\""))
+        #expect(completedUnicode == "\"Unicode escape: \"")
+        #expect(isValidJSON(completedUnicode))
+
+        for unicodeEscape in ["\\u", "\\u2", "\\u26", "\\u266"] {
+            let completedPrefix = try completer.complete("\"Prefix: \(unicodeEscape)")
+            #expect(completedPrefix == "\"Prefix: \"")
+            #expect(isValidJSON(completedPrefix))
+        }
+
+        // Test a complete escaped backslash at the end of a partial string
+        let escapedBackslash = "\"Escaped backslash: \\\\"
+        let completedBackslash = try completer.complete(escapedBackslash)
+        #expect(completedBackslash == "\"Escaped backslash: \\\\\"")
+        #expect(isValidJSON(completedBackslash))
+
+        let partialObjectEscape = "{\"text\": \"Partial escape: \\"
+        let completedObject = try completer.complete(partialObjectEscape)
+        #expect(completedObject == "{\"text\": \"Partial escape: \"}")
+        #expect(isValidJSON(completedObject))
     }
 
     @Test("Empty and Whitespace-Only JSON")
@@ -238,7 +256,7 @@ final class JSONCompleterTests {
         }
 
         do {
-            _ = try JSONSerialization.jsonObject(with: data, options: [])
+            _ = try JSONSerialization.jsonObject(with: data, options: [.fragmentsAllowed])
             return true
         } catch {
             return false
