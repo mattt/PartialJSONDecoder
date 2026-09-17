@@ -196,11 +196,19 @@ public class JSONCompleter {
         current = skipWhitespace(json, from: current)
 
         // If we've reached the end or only have whitespace, close the array
-        if current >= json.endIndex || json[current] == "]" {
+        if current >= json.endIndex {
             return (string: "]", endIndex: current)
         }
 
+        // The existing closing bracket completes an empty array.
+        if json[current] == "]" {
+            return nil
+        }
+
         while current < json.endIndex {
+            current = skipWhitespace(json, from: current)
+            if current >= json.endIndex { break }
+
             // Check for closing bracket
             if json[current] == "]" {
                 // Found closing bracket, array is complete
@@ -261,11 +269,19 @@ public class JSONCompleter {
         current = skipWhitespace(json, from: current)
 
         // If we've reached the end or only have whitespace, close the object
-        if current >= json.endIndex || json[current] == "}" {
+        if current >= json.endIndex {
             return (string: "}", endIndex: current)
         }
 
+        // The existing closing brace completes an empty object.
+        if json[current] == "}" {
+            return nil
+        }
+
         while current < json.endIndex {
+            current = skipWhitespace(json, from: current)
+            if current >= json.endIndex { break }
+
             // Check for closing brace
             if json[current] == "}" {
                 // Found closing brace, object is complete
