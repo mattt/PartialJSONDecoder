@@ -25,14 +25,15 @@ struct AsyncSequenceExtensionTests {
         let json = "{\"actual_value\": 42}"
 
         // Start collecting
-        var results: [(SnakeCaseValue, Bool)] = []
         let collectTask = Task {
+            var results: [(SnakeCaseValue, Bool)] = []
             for try await result in asyncSequence.partialJSON(
                 decoding: SnakeCaseValue.self,
                 with: customDecoder
             ) {
                 results.append(result)
             }
+            return results
         }
 
         // Send JSON
@@ -41,7 +42,7 @@ struct AsyncSequenceExtensionTests {
         }
 
         await asyncSequence.finish()
-        try await collectTask.value
+        let results = try await collectTask.value
 
         // Check custom decoder properly converted snake_case to camelCase
         #expect(results.count > 0)
@@ -61,15 +62,16 @@ struct AsyncSequenceExtensionTests {
 
         // Test with small buffer
         let smallBufferSequence = AsyncThroughSequence<UInt8>()
-        var smallBufferResults: [(SimpleValue, Bool)] = []
 
         let smallBufferTask = Task {
+            var results: [(SimpleValue, Bool)] = []
             for try await result in smallBufferSequence.partialJSON(
                 decoding: SimpleValue.self,
                 bufferSize: smallBufferSize
             ) {
-                smallBufferResults.append(result)
+                results.append(result)
             }
+            return results
         }
 
         // Send JSON to small buffer sequence
@@ -77,19 +79,20 @@ struct AsyncSequenceExtensionTests {
             await smallBufferSequence.send(byte)
         }
         await smallBufferSequence.finish()
-        try await smallBufferTask.value
+        let smallBufferResults = try await smallBufferTask.value
 
         // Test with large buffer
         let largeBufferSequence = AsyncThroughSequence<UInt8>()
-        var largeBufferResults: [(SimpleValue, Bool)] = []
 
         let largeBufferTask = Task {
+            var results: [(SimpleValue, Bool)] = []
             for try await result in largeBufferSequence.partialJSON(
                 decoding: SimpleValue.self,
                 bufferSize: largeBufferSize
             ) {
-                largeBufferResults.append(result)
+                results.append(result)
             }
+            return results
         }
 
         // Send JSON to large buffer sequence
@@ -97,7 +100,7 @@ struct AsyncSequenceExtensionTests {
             await largeBufferSequence.send(byte)
         }
         await largeBufferSequence.finish()
-        try await largeBufferTask.value
+        let largeBufferResults = try await largeBufferTask.value
 
         // Both should successfully decode
         #expect(smallBufferResults.count > 0)
@@ -120,12 +123,13 @@ struct AsyncSequenceExtensionTests {
         let json = "{\"value\": 123}"
 
         // Start collecting
-        var results: [(SimpleValue, Bool)] = []
         let collectTask = Task {
+            var results: [(SimpleValue, Bool)] = []
             // Use the method with just the required parameter
             for try await result in asyncSequence.partialJSON(decoding: SimpleValue.self) {
                 results.append(result)
             }
+            return results
         }
 
         // Send JSON
@@ -133,7 +137,7 @@ struct AsyncSequenceExtensionTests {
             await asyncSequence.send(byte)
         }
         await asyncSequence.finish()
-        try await collectTask.value
+        let results = try await collectTask.value
 
         // Default parameters should work fine
         #expect(results.count > 0)

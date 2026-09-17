@@ -8,30 +8,59 @@ on:
 
 permissions:
   contents: read
-  pull-requests: write
 
 jobs:
-  test:
-    timeout-minutes: 5
+  test-macos:
+    name: Swift ${{ matrix.swift }} on macOS ${{ matrix.macos }} with Xcode ${{ matrix.xcode }}
+    runs-on: macos-${{ matrix.macos }}
+    env:
+      DEVELOPER_DIR: "/Applications/Xcode_${{ matrix.xcode }}.app/Contents/Developer"
     strategy:
+      fail-fast: false
       matrix:
-        swift-version:
-          - 6.0.3
-          - 6.1.0
-
-    runs-on: macos-latest
-    name: Test (Swift ${{ matrix.swift-version }})
-
+        include:
+          - swift: "6.0"
+            xcode: "16.0"
+            macos: "15"
+          - swift: "6.1"
+            xcode: "16.3"
+            macos: "15"
+          - swift: "6.2"
+            xcode: "26.0"
+            macos: "26"
+          - swift: "6.3"
+            xcode: "26.6"
+            macos: "26"
+    timeout-minutes: 10
     steps:
-      - uses: actions/checkout@v4
-
-      - name: Setup Swift on macOS
-        uses: swift-actions/setup-swift@v2
-        with:
-          swift-version: ${{ matrix.swift-version }}
+      - name: Checkout code
+        uses: actions/checkout@v7
 
       - name: Build
-        run: swift build -v
+        run: swift build
 
-      - name: Run tests
-        run: swift test -v
+      - name: Test
+        run: swift test
+
+  test-linux:
+    name: Swift ${{ matrix.swift }} on Linux
+    runs-on: ubuntu-latest
+    container: "swift:${{ matrix.swift }}"
+    strategy:
+      fail-fast: false
+      matrix:
+        swift:
+          - "6.0.3"
+          - "6.1.3"
+          - "6.2.3"
+          - "6.3.3"
+    timeout-minutes: 10
+    steps:
+      - name: Checkout code
+        uses: actions/checkout@v7
+
+      - name: Build
+        run: swift build
+
+      - name: Test
+        run: swift test
