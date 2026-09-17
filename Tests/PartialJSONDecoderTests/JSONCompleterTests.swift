@@ -31,6 +31,24 @@ final class JSONCompleterTests {
                 == "{\"name\": \"Alice\", \"age\": 30, \"hobbies\": [\"reading\", \"hiking\"]}")
     }
 
+    @Test("Values after empty nested collections")
+    func testValuesAfterEmptyNestedCollections() throws {
+        let completer = JSONCompleter()
+
+        #expect(try completer.complete("{\"a\": {}, \"b\": 2") == "{\"a\": {}, \"b\": 2}")
+        #expect(try completer.complete("{\"a\": [], \"b\": 2") == "{\"a\": [], \"b\": 2}")
+        #expect(try completer.complete("[{}, 2") == "[{}, 2]")
+        #expect(try completer.complete("[[], 2") == "[[], 2]")
+    }
+
+    @Test("Whitespace before collection delimiters")
+    func testWhitespaceBeforeCollectionDelimiters() throws {
+        let completer = JSONCompleter()
+
+        #expect(try completer.complete("[1 , 2") == "[1 , 2]")
+        #expect(try completer.complete("{\"a\": 1 , \"b\": 2") == "{\"a\": 1 , \"b\": 2}")
+    }
+
     @Test("Public Completion Method")
     func testPublicCompletionMethod() throws {
         let completer = JSONCompleter()
