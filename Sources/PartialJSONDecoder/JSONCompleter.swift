@@ -24,7 +24,8 @@ public class JSONCompleter {
     /// By default, an error will be thrown if a non-conforming number value is encountered.
     public var nonConformingFloatStrategy: NonConformingFloatDecodingStrategy = .throw
 
-    /// Maximum depth for nested JSON structures to prevent stack overflow from deeply nested inputs.
+    /// Maximum number of nested arrays and objects to prevent stack overflow from deeply nested
+    /// inputs.
     /// By default, the maximum depth is 64, which is sufficient for most legitimate JSON.
     ///
     /// - Important: This helps mitigate [CWE-674: Uncontrolled Recursion](https://cwe.mitre.org/data/definitions/674.html)
@@ -238,7 +239,7 @@ public class JSONCompleter {
             }
 
             // Parse the element
-            if let elementCompletion = try completeValue(json, from: current, depth: depth + 1) {
+            if let elementCompletion = try completeValue(json, from: current, depth: depth) {
                 // Element is incomplete
                 return (
                     string: elementCompletion.string + "]", endIndex: elementCompletion.endIndex
@@ -347,7 +348,7 @@ public class JSONCompleter {
                 return (string: "null}", endIndex: lastValidIndex)
             }
 
-            if let valueCompletion = try completeValue(json, from: current, depth: depth + 1) {
+            if let valueCompletion = try completeValue(json, from: current, depth: depth) {
                 // Value is incomplete
                 return (string: valueCompletion.string + "}", endIndex: valueCompletion.endIndex)
             } else {
@@ -470,18 +471,16 @@ public class JSONCompleter {
         return nil
     }
 
-    /// Finds the index immediately after a complete JSON value (string, number, object, array, bool, null).
+    /// Finds the index immediately after a complete JSON value (string, number, object, array, bool,
+    /// or null).
+    ///
+    /// Callers invoke this only after `completeValue` has reported the value complete, so this scans
+    /// the text once without running the completer again.
     private func findEndOfCompleteValue(
         _ json: String, from startIndex: String.Index, lookingFor: Character? = nil
     ) -> String.Index {
         let start = skipWhitespace(json, from: startIndex)
         guard start < json.endIndex else { return start }
-
-        // Try to parse the value
-        if let result = try? completeValue(json, from: start, depth: 0) {
-            // Value is incomplete, use its endIndex
-            return result.endIndex
-        }
 
         // Value is complete, need to find its end index
         let firstChar = json[start]

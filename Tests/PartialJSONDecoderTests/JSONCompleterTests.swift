@@ -107,6 +107,19 @@ final class JSONCompleterTests {
             #expect(error is JSONCompletionError)
         }
 
+        do {
+            _ = try completer.complete(String(repeating: "[", count: 11))
+            #expect(Bool(false), "Expected an error for nesting beyond the configured limit")
+        } catch {
+            #expect(error is JSONCompletionError)
+        }
+
+        let maximumDepthArrayOpening = String(repeating: "[", count: 10)
+        let maximumDepthArrayClosing = String(repeating: "]", count: 10)
+        #expect(
+            (try? completer.complete(maximumDepthArrayOpening))
+                == maximumDepthArrayOpening + maximumDepthArrayClosing)
+
         // Check with a valid depth (5 levels of nesting is safe)
         do {
             let validDepthArrayOpening = String(repeating: "[", count: 5)
@@ -120,6 +133,25 @@ final class JSONCompleterTests {
         // Default completer should have a higher limit
         let defaultCompleter = JSONCompleter()
         #expect(defaultCompleter.maximumDepth >= 32)
+    }
+
+    @Test("Complete nested siblings are scanned in linear time")
+    func testCompleteNestedSiblingsAreScannedInLinearTime() throws {
+        let completer = JSONCompleter()
+        let depth = 60
+        let arraySibling =
+            String(repeating: "[", count: depth) + String(repeating: "]", count: depth)
+
+        #expect(
+            try completer.complete("[" + arraySibling + ", [1")
+                == "[" + arraySibling + ", [1]]")
+
+        let objectSibling =
+            String(repeating: "{\"a\": ", count: depth) + "1"
+            + String(repeating: "}", count: depth)
+        #expect(
+            try completer.complete("{\"x\": " + objectSibling + ", \"y\": \"tail")
+                == "{\"x\": " + objectSibling + ", \"y\": \"tail\"}")
     }
 
     @Test("Complex Nested Structures")
