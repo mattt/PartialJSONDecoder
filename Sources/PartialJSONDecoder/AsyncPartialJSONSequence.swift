@@ -55,6 +55,20 @@ where Base.Element == UInt8 {
         var hasEmittedValue = false
         var endOfSequence = false
 
+        private static func isJSONWhitespace(_ byte: UInt8) -> Bool {
+            switch byte {
+            case 0x20, 0x09, 0x0A, 0x0D: return true
+            default: return false
+            }
+        }
+
+        private var startsWithNumber: Bool {
+            guard let first = buffer.first(where: { !Self.isJSONWhitespace($0) }) else {
+                return false
+            }
+            return first == UInt8(ascii: "-") || (UInt8(ascii: "0")...UInt8(ascii: "9")).contains(first)
+        }
+
         init(
             base: Base.AsyncIterator,
             decoder: PartialJSONDecoder,
@@ -67,7 +81,6 @@ where Base.Element == UInt8 {
 
         public mutating func next() async throws -> Element? {
             while true {
-                // 1. Handle End of Sequence first
                 if self.endOfSequence {
                     if buffer.isEmpty {
                         return nil  // Stream ended, buffer empty, we are done.
@@ -100,35 +113,32 @@ where Base.Element == UInt8 {
                     }
                 }
 
-                // 2. Mid-Stream: Attempt Decode if buffer has data
-                var emittedMidStream: Element? = nil
-                if !buffer.isEmpty {
-                    // Use try? to ignore decoding errors mid-stream
-                    if let result = try? decoder.decode(T.self, from: Data(buffer)) {
-                        let isNewValue = (lastValue == nil || result.value != lastValue)
-
-                        if isNewValue {
-                            lastValue = result.value
-                            hasEmittedValue = true
-                            // isComplete is false because self.endOfSequence is false here
-                            emittedMidStream = (value: result.value, isComplete: false)
-
-                            // Clear buffer ONLY if the decoder specifically reported this chunk as complete
-                            // This allows for multiple top-level JSON objects/arrays in sequence
-                            if result.isComplete {
+                if let lastByte = buffer.last,
+                    let result = try? decoder.decode(T.self, from: Data(buffer))
+                {
+                    let isNewValue = lastValue == nil || result.value != lastValue
+                    if result.isComplete {
+                        if startsWithNumber {
+                            // A valid number can still grow until whitespace or EOF.
+                            if Self.isJSONWhitespace(lastByte) {
                                 buffer.removeAll()
+                                lastValue = nil
+                                hasEmittedValue = true
+                                return (value: result.value, isComplete: true)
                             }
+                        } else if isNewValue {
+                            buffer.removeAll()
                         }
                     }
-                    // If try? returns nil (decode failed), we simply proceed to fetch more data
+
+                    if isNewValue {
+                        lastValue = result.value
+                        hasEmittedValue = true
+                        return (value: result.value, isComplete: false)
+                    }
                 }
 
-                // 3. Return if a mid-stream value was prepared
-                if let valueToEmit = emittedMidStream {
-                    return valueToEmit
-                }
-
-                // 4. Fetch More Data (only if stream hasn't ended)
+                // Fetch more data.
                 do {
                     if let byte = try await baseIterator.next() {
                         buffer.append(byte)

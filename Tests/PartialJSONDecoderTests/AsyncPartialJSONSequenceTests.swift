@@ -14,6 +14,44 @@ struct AsyncPartialJSONSequenceTests {
         let value: Int
     }
 
+    @Test("Top-level numbers retain their digits until EOF", arguments: [
+        ("42", 42.0), ("-12.75", -12.75), ("3.5e-2", 0.035), ("2E+12", 2e12),
+    ])
+    func testNumberAtEOF(json: String, expected: Double) async throws {
+        var completed: [Double] = []
+        for try await result in AsyncBytes(json.utf8).partialJSON(decoding: Double.self)
+        where result.isComplete {
+            completed.append(result.value)
+        }
+        #expect(completed == [expected])
+    }
+
+    @Test("JSON whitespace terminates each top-level number")
+    func testDelimitedNumbers() async throws {
+        let json = " \t42\r\n42 7\t"
+        var provisional: [Int] = []
+        var completed: [Int] = []
+        for try await result in AsyncBytes(json.utf8).partialJSON(decoding: Int.self) {
+            if result.isComplete {
+                completed.append(result.value)
+            } else {
+                provisional.append(result.value)
+            }
+        }
+        #expect(provisional == [4, 42, 4, 42, 7])
+        #expect(completed == [42, 42, 7])
+    }
+
+    @Test("Whitespace inside a numeric-looking string remains part of the value")
+    func testStreamedString() async throws {
+        let bytes = AsyncBytes(#""42 7""#.utf8)
+        var completed: [String] = []
+        for try await result in bytes.partialJSON(decoding: String.self) where result.isComplete {
+            completed.append(result.value)
+        }
+        #expect(completed == ["42 7"])
+    }
+
     @Test("Basic Async Partial JSON Sequence")
     func testBasicAsyncPartialJSONSequence() async throws {
         // Create a simpler sequence with fewer chunks for testing
